@@ -4,67 +4,93 @@ import io.github.andriyko69.vitalxp.Config;
 import io.github.andriyko69.vitalxp.data.HeartProgress;
 import io.github.andriyko69.vitalxp.data.ModAttachments;
 import net.minecraft.server.level.ServerPlayer;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
-import net.neoforged.neoforge.event.entity.player.PlayerXpEvent;
+import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 public final class VitalXpEvents {
     private VitalXpEvents() {
     }
 
-    @SubscribeEvent
-    public static void onLevelChange(PlayerXpEvent.LevelChange event) {
-        if (!(event.getEntity() instanceof ServerPlayer player)) return;
-
-        HeartProgress prog = player.getData(ModAttachments.HEART_PROGRESS.get());
-
-        int oldLevel = player.experienceLevel - event.getLevels();
-        int newLevel = player.experienceLevel;
-
-        int gained = HeartLogic.awardFromLevels(oldLevel, newLevel, prog);
-        if (gained > 0) {
-            HeartLogic.applyMaxHealth(player, prog);
-            HeartLogic.onHeartGained(player, gained);
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onPlayerTick(PlayerTickEvent.Post event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) {
+            return;
         }
 
-        prog.setLastLevel(newLevel);
+        var attachment = ModAttachments.HEART_PROGRESS.get();
+        HeartProgress progress = player.getData(attachment);
+        ProgressionLogic.Reconciliation result = ProgressionLogic.reconcile(
+                progress,
+                player.experienceLevel,
+                Config.levelInterval
+        );
+
+        if (!result.progress().equals(progress)) {
+            player.setData(attachment, result.progress());
+        }
+
+        HeartLogic.applyMaxHealth(player, result.progress(), false);
+        HeartLogic.onHeartGained(player, result.gainedTiers());
     }
 
     @SubscribeEvent
     public static void onLogin(PlayerEvent.PlayerLoggedInEvent event) {
-        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (!(event.getEntity() instanceof ServerPlayer player)) {
+            return;
+        }
 
-        HeartProgress prog = player.getData(ModAttachments.HEART_PROGRESS.get());
+        var attachment = ModAttachments.HEART_PROGRESS.get();
+        HeartProgress progress;
+        if (player.hasData(attachment)) {
+            progress = player.getData(attachment);
+        } else {
+            progress = HeartLogic.migrateLegacyProgress(player);
+        }
 
-        prog.setLastLevel(player.experienceLevel);
-        HeartLogic.applyMaxHealth(player, prog);
+        ProgressionLogic.Reconciliation result = ProgressionLogic.reconcile(
+                progress,
+                player.experienceLevel,
+                Config.levelInterval
+        );
+        player.setData(attachment, result.progress());
+
+        // Force replacement so a legacy permanent modifier is removed from saved attribute data.
+        HeartLogic.applyMaxHealth(player, result.progress(), true);
     }
 
     @SubscribeEvent
     public static void onRespawn(PlayerEvent.PlayerRespawnEvent event) {
-        if (!(event.getEntity() instanceof ServerPlayer player)) return;
-
-        HeartProgress prog = player.getData(ModAttachments.HEART_PROGRESS.get());
-        prog.setLastLevel(player.experienceLevel);
-        HeartLogic.applyMaxHealth(player, prog);
-    }
-
-    @SubscribeEvent
-    public static void onClone(PlayerEvent.Clone event) {
-        if (!(event.getEntity() instanceof ServerPlayer newPlayer)) return;
-        if (!(event.getOriginal() instanceof ServerPlayer oldPlayer)) return;
-
-        HeartProgress oldProg = oldPlayer.getData(ModAttachments.HEART_PROGRESS.get());
-        HeartProgress newProg = newPlayer.getData(ModAttachments.HEART_PROGRESS.get());
-
-        boolean wasDeath = event.isWasDeath();
-
-        if (wasDeath && Config.resetOnDeath) {
-            newProg.setTiers(0);
-        } else {
-            newProg.setTiers(oldProg.tiers());
+        if (!(event.getEntity() instanceof ServerPlayer player)) {
+            return;
         }
 
-        newProg.setLastLevel(newPlayer.experienceLevel);
+        HeartProgress progress = player.getData(ModAttachments.HEART_PROGRESS.get());
+        HeartLogic.applyMaxHealth(player, progress, true);
+
+        if (!event.isEndConquered()) {
+            player.setHealth(player.getMaxHealth());
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onClone(PlayerEvent.Clone event) {
+        if (!(event.getEntity() instanceof ServerPlayer newPlayer)) {
+            return;
+        }
+        if (!(event.getOriginal() instanceof ServerPlayer oldPlayer)) {
+            return;
+        }
+
+        HeartProgress oldProgress = oldPlayer.getData(ModAttachments.HEART_PROGRESS.get());
+        HeartProgress newProgress;
+        if (event.isWasDeath() && Config.resetOnDeath) {
+            newProgress = new HeartProgress(0, Math.max(0, newPlayer.experienceLevel));
+        } else {
+            newProgress = oldProgress;
+        }
+
+        newPlayer.setData(ModAttachments.HEART_PROGRESS.get(), newProgress);
     }
 }

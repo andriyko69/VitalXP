@@ -12,57 +12,62 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 
 public final class HeartLogic {
     private static final ResourceLocation HEALTH_MOD_ID = ResourceLocation.fromNamespaceAndPath(VitalXP.MODID, "bonus_health");
+    private static final double VANILLA_MAX_HEALTH = 20.0;
 
     private HeartLogic() {
     }
 
-    /**
-     * Computes how many heart-tiers were gained due to a level increase and updates progress.
-     */
-    public static int awardFromLevels(int oldLevel, int newLevel, HeartProgress prog) {
-        if (newLevel <= oldLevel) return 0;
+    public static HeartProgress migrateLegacyProgress(ServerPlayer player) {
+        int legacyTiers = 0;
+        var attribute = player.getAttribute(Attributes.MAX_HEALTH);
+        if (attribute != null) {
+            AttributeModifier modifier = attribute.getModifier(HEALTH_MOD_ID);
+            if (modifier != null && modifier.operation() == AttributeModifier.Operation.ADD_VALUE) {
+                legacyTiers = ProgressionLogic.inferLegacyTiers(modifier.amount(), Config.baseVitality);
+            }
+        }
 
-        int interval = Config.levelInterval;
-
-        int oldMilestones = oldLevel / interval;
-        int newMilestones = newLevel / interval;
-
-        int gained = Math.max(0, newMilestones - oldMilestones);
-        if (gained > 0) prog.setTiers(prog.tiers() + gained);
-
-        return gained;
+        return ProgressionLogic.initialProgress(player.experienceLevel, Config.levelInterval, legacyTiers);
     }
 
     /**
-     * Applies max health based on config + tiers (1 tier = +1 heart = +2 HP).
+     * Applies VitalXP's deterministic, vanilla-relative max-health contribution.
      */
-    public static void applyMaxHealth(ServerPlayer player, HeartProgress prog) {
-        int targetHp = Config.baseVitality + (prog.tiers() * 2);
-        if (Config.healthCap != -1) targetHp = Math.min(targetHp, Config.healthCap);
+    public static void applyMaxHealth(ServerPlayer player, HeartProgress progress, boolean forceTransientReplacement) {
+        long targetVitality = (long) Config.baseVitality + (long) progress.earnedTiers() * 2L;
+        if (Config.healthCap != -1) {
+            targetVitality = Math.min(targetVitality, Config.healthCap);
+        }
+        double modifierAmount = targetVitality - VANILLA_MAX_HEALTH;
 
-        var attr = player.getAttribute(Attributes.MAX_HEALTH);
-        if (attr == null) return;
+        var attribute = player.getAttribute(Attributes.MAX_HEALTH);
+        if (attribute == null) {
+            return;
+        }
 
-        // Vanilla base is 20 HP. We offset from that.
-        double add = targetHp - 20.0;
+        AttributeModifier existing = attribute.getModifier(HEALTH_MOD_ID);
+        boolean matches = existing != null
+                && existing.operation() == AttributeModifier.Operation.ADD_VALUE
+                && Double.compare(existing.amount(), modifierAmount) == 0;
 
-        AttributeModifier existing = attr.getModifier(HEALTH_MOD_ID);
-        if (existing != null) attr.removeModifier(existing);
+        if (forceTransientReplacement || !matches) {
+            attribute.removeModifier(HEALTH_MOD_ID);
+            attribute.addTransientModifier(new AttributeModifier(
+                    HEALTH_MOD_ID,
+                    modifierAmount,
+                    AttributeModifier.Operation.ADD_VALUE
+            ));
+        }
 
-        attr.addPermanentModifier(new AttributeModifier(
-                HEALTH_MOD_ID,
-                add,
-                AttributeModifier.Operation.ADD_VALUE
-        ));
-
-        // Ensure current HP isn't above new max
         if (player.getHealth() > player.getMaxHealth()) {
             player.setHealth(player.getMaxHealth());
         }
     }
 
-    public static void onHeartGained(ServerPlayer player, int gainedHearts) {
-        if (gainedHearts <= 0) return;
+    public static void onHeartGained(ServerPlayer player, int gainedTiers) {
+        if (gainedTiers <= 0) {
+            return;
+        }
 
         if (Config.playUpgradeSound) {
             player.level().playSound(
@@ -76,9 +81,14 @@ public final class HeartLogic {
         }
 
         if (Config.consumeXpOnUpgrade) {
-            int cost = Config.xpCostPerUpgrade;
-            int totalCost = (cost == -1) ? player.experienceLevel : (cost * gainedHearts);
-            if (totalCost != 0) player.giveExperienceLevels(-totalCost);
+            int availableLevels = Math.max(0, player.experienceLevel);
+            long requestedCost = Config.xpCostPerUpgrade == -1
+                    ? availableLevels
+                    : (long) Config.xpCostPerUpgrade * gainedTiers;
+            int consumedLevels = (int) Math.min(requestedCost, availableLevels);
+            if (consumedLevels > 0) {
+                player.giveExperienceLevels(-consumedLevels);
+            }
         }
 
         if (Config.restoreOnUpgrade) {
