@@ -11,7 +11,9 @@ public class Config {
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
     private static final ModConfigSpec.IntValue BASE_VITALITY = BUILDER.comment("Base health points for players. 20 = 10 hearts").defineInRange("baseVitality", 20, 1, 255);
-    private static final ModConfigSpec.IntValue HEALTH_CAP = BUILDER.comment("Maximum health points players can have. 20 = 10 hearts").defineInRange("healthCap", 40, 1, 255);
+    private static final ModConfigSpec.ConfigValue<Integer> HEALTH_CAP = BUILDER
+            .comment("Maximum VitalXP health points. 20 = 10 hearts. Set to -1 to disable")
+            .define("healthCap", 40, value -> value instanceof Integer cap && (cap == -1 || cap >= 1 && cap <= 255));
     private static final ModConfigSpec.IntValue LEVEL_INTERVAL = BUILDER.comment("Number of levels required to gain 1 heart").defineInRange("levelInterval", 5, 1, 255);
     private static final ModConfigSpec.BooleanValue PLAY_UPGRADE_SOUND = BUILDER.comment("Whether to play the level-up sound when gaining a heart").define("playUpgradeSound", true);
     private static final ModConfigSpec.BooleanValue RESET_ON_DEATH = BUILDER.comment("Whether to reset gained hearts on death").define("resetProgressOnDeath", true);

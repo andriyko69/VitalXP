@@ -14,8 +14,9 @@ public final class ModAttachments {
 
     public static final Supplier<AttachmentType<HeartProgress>> HEART_PROGRESS =
             ATTACHMENTS.register("heart_progress", () ->
-                    AttachmentType.builder(() -> new HeartProgress(0, 0))
-                            // We will copy/reset explicitly in PlayerEvent.Clone to respect RESET_ON_DEATH.
+                    AttachmentType.builder(() -> HeartProgress.EMPTY)
+                            .serialize(HeartProgress.CODEC)
+                            // Death copying remains explicit because resetProgressOnDeath is configurable.
                             .build()
             );
 
