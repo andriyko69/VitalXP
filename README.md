@@ -26,6 +26,9 @@ Progress is based on the highest XP level the player has reached. Spending XP th
 - **Reset Progress on Death**  
   If enabled, earned hearts are reset on death.
 
+- **Reduce Health on XP Loss**
+  When enabled, VitalXP fully synchronizes bonus hearts to the player's current XP level. Enchanting, anvils, commands, death, XP consumption, and other level losses can remove hearts. Disabled by default to preserve permanent-heart progression.
+
 - **Restore Health on Upgrade**  
   Heals the player when a new heart is unlocked.
 
@@ -39,6 +42,8 @@ Progress is based on the highest XP level the player has reached. Spending XP th
 If several milestones are reached in one operation, VitalXP applies the final health value once, plays at most one upgrade sound, heals at most once, and consumes the combined level cost once. The progression checkpoint is saved before XP is consumed.
 
 Changing the level interval does not retroactively grant or remove hearts. The new interval applies as the player exceeds their saved highest level. Milestones earned beyond the health cap remain saved and become visible if the cap is raised later.
+
+When `reduceHealthOnXpLoss` is enabled, current-level synchronization replaces the permanent high-water behavior: changing the level interval recalculates health immediately, and disabling the option later continues from the progression state produced by the current XP level.
 
 Existing worlds are migrated from the exact legacy `vitalxp:bonus_health` modifier and the player's current XP level. Progress hidden above an old cap, or already erased by an older VitalXP login, cannot always be reconstructed exactly.
 

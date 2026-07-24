@@ -17,6 +17,9 @@ public class Config {
     private static final ModConfigSpec.IntValue LEVEL_INTERVAL = BUILDER.comment("Number of levels required to gain 1 heart").defineInRange("levelInterval", 5, 1, 255);
     private static final ModConfigSpec.BooleanValue PLAY_UPGRADE_SOUND = BUILDER.comment("Whether to play the level-up sound when gaining a heart").define("playUpgradeSound", true);
     private static final ModConfigSpec.BooleanValue RESET_ON_DEATH = BUILDER.comment("Whether to reset gained hearts on death").define("resetProgressOnDeath", true);
+    private static final ModConfigSpec.BooleanValue REDUCE_HEALTH_ON_XP_LOSS = BUILDER
+            .comment("Whether health should always match the current XP level, removing hearts when levels are lost")
+            .define("reduceHealthOnXpLoss", false);
     private static final ModConfigSpec.BooleanValue RESTORE_ON_UPGRADE = BUILDER.comment("Whether to restore health when gaining a heart").define("restoreHealthOnUpgrade", true);
     private static final ModConfigSpec.BooleanValue CONSUME_XP_ON_UPGRADE = BUILDER.comment("Whether to consume XP levels when gaining a heart").define("consumeXpOnUpgrade", false);
     private static final ModConfigSpec.IntValue XP_COST_PER_UPGRADE = BUILDER.comment("Number of XP levels consumed per heart gain. Set to -1 to consume all levels").defineInRange("xpCostPerUpgrade", 1, -1, 255);
@@ -28,6 +31,7 @@ public class Config {
     public static int levelInterval;
     public static boolean playUpgradeSound;
     public static boolean resetOnDeath;
+    public static boolean reduceHealthOnXpLoss;
     public static boolean restoreOnUpgrade;
     public static boolean consumeXpOnUpgrade;
     public static int xpCostPerUpgrade;
@@ -39,6 +43,7 @@ public class Config {
         levelInterval = LEVEL_INTERVAL.get();
         playUpgradeSound = PLAY_UPGRADE_SOUND.get();
         resetOnDeath = RESET_ON_DEATH.get();
+        reduceHealthOnXpLoss = REDUCE_HEALTH_ON_XP_LOSS.get();
         restoreOnUpgrade = RESTORE_ON_UPGRADE.get();
         consumeXpOnUpgrade = CONSUME_XP_ON_UPGRADE.get();
         xpCostPerUpgrade = XP_COST_PER_UPGRADE.get();

@@ -54,6 +54,31 @@ class ProgressionLogicTest {
     }
 
     @Test
+    void currentLevelSyncRemovesAndReaddsTiers() {
+        HeartProgress atTwenty = ProgressionLogic.reconcileToCurrentLevel(HeartProgress.EMPTY, 20, 5).progress();
+
+        var spent = ProgressionLogic.reconcileToCurrentLevel(atTwenty, 11, 5);
+        var regained = ProgressionLogic.reconcileToCurrentLevel(spent.progress(), 17, 5);
+
+        assertEquals(new HeartProgress(2, 11), spent.progress());
+        assertEquals(0, spent.gainedTiers());
+        assertEquals(new HeartProgress(3, 17), regained.progress());
+        assertEquals(1, regained.gainedTiers());
+    }
+
+    @Test
+    void currentLevelSyncIsIdempotentAndHandlesDirectLoss() {
+        HeartProgress progress = ProgressionLogic.reconcileToCurrentLevel(HeartProgress.EMPTY, 17, 5).progress();
+
+        var repeated = ProgressionLogic.reconcileToCurrentLevel(progress, 17, 5);
+        var reset = ProgressionLogic.reconcileToCurrentLevel(repeated.progress(), 0, 5);
+
+        assertEquals(0, repeated.gainedTiers());
+        assertEquals(new HeartProgress(0, 0), reset.progress());
+        assertEquals(0, reset.gainedTiers());
+    }
+
+    @Test
     void intervalChangeOnlyAffectsFutureHighs() {
         HeartProgress progress = ProgressionLogic.reconcile(HeartProgress.EMPTY, 17, 5).progress();
 

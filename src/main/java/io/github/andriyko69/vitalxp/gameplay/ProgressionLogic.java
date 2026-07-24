@@ -26,6 +26,15 @@ public final class ProgressionLogic {
         return new Reconciliation(new HeartProgress(updatedTiers, observedLevel), gainedTiers);
     }
 
+    public static Reconciliation reconcileToCurrentLevel(HeartProgress progress, int currentLevel, int levelInterval) {
+        int observedLevel = Math.max(0, currentLevel);
+        int interval = Math.max(1, levelInterval);
+        int currentTiers = observedLevel / interval;
+        int gainedTiers = Math.max(0, currentTiers - progress.earnedTiers());
+
+        return new Reconciliation(new HeartProgress(currentTiers, observedLevel), gainedTiers);
+    }
+
     public static HeartProgress initialProgress(int currentLevel, int levelInterval, int legacyTiers) {
         int observedLevel = Math.max(0, currentLevel);
         int interval = Math.max(1, levelInterval);

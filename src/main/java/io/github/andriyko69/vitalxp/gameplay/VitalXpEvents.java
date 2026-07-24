@@ -21,11 +21,7 @@ public final class VitalXpEvents {
 
         var attachment = ModAttachments.HEART_PROGRESS.get();
         HeartProgress progress = player.getData(attachment);
-        ProgressionLogic.Reconciliation result = ProgressionLogic.reconcile(
-                progress,
-                player.experienceLevel,
-                Config.levelInterval
-        );
+        ProgressionLogic.Reconciliation result = reconcile(player, progress);
 
         if (!result.progress().equals(progress)) {
             player.setData(attachment, result.progress());
@@ -49,11 +45,7 @@ public final class VitalXpEvents {
             progress = HeartLogic.migrateLegacyProgress(player);
         }
 
-        ProgressionLogic.Reconciliation result = ProgressionLogic.reconcile(
-                progress,
-                player.experienceLevel,
-                Config.levelInterval
-        );
+        ProgressionLogic.Reconciliation result = reconcile(player, progress);
         player.setData(attachment, result.progress());
 
         // Force replacement so a legacy permanent modifier is removed from saved attribute data.
@@ -66,7 +58,16 @@ public final class VitalXpEvents {
             return;
         }
 
-        HeartProgress progress = player.getData(ModAttachments.HEART_PROGRESS.get());
+        var attachment = ModAttachments.HEART_PROGRESS.get();
+        HeartProgress progress = player.getData(attachment);
+        if (Config.reduceHealthOnXpLoss) {
+            progress = ProgressionLogic.reconcileToCurrentLevel(
+                    progress,
+                    player.experienceLevel,
+                    Config.levelInterval
+            ).progress();
+            player.setData(attachment, progress);
+        }
         HeartLogic.applyMaxHealth(player, progress, true);
 
         if (!event.isEndConquered()) {
@@ -92,5 +93,16 @@ public final class VitalXpEvents {
         }
 
         newPlayer.setData(ModAttachments.HEART_PROGRESS.get(), newProgress);
+    }
+
+    private static ProgressionLogic.Reconciliation reconcile(ServerPlayer player, HeartProgress progress) {
+        if (Config.reduceHealthOnXpLoss) {
+            return ProgressionLogic.reconcileToCurrentLevel(
+                    progress,
+                    player.experienceLevel,
+                    Config.levelInterval
+            );
+        }
+        return ProgressionLogic.reconcile(progress, player.experienceLevel, Config.levelInterval);
     }
 }
